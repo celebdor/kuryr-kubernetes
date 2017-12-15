@@ -15,6 +15,13 @@ from oslo_serialization import jsonutils
 
 CONF = cfg.CONF
 
+VALID_MULTI_POD_POOLS_OPTS = {'noop': ['neutron-vif',
+                                       'nested-vlan',
+                                       'nested-macvlan'],
+                              'neutron': ['neutron-vif'],
+                              'nested': ['nested-vlan'],
+                              }
+
 
 def utf8_json_decoder(byte_data):
     """Deserializes the bytes into UTF-8 encoded JSON.
@@ -39,3 +46,10 @@ def convert_netns(netns):
         return netns.replace('/proc', CONF.cni_daemon.netns_proc_dir)
     else:
         return netns
+
+
+def check_suitable_multi_pool_driver_opt(pool_driver, pod_driver):
+    valid_pod_driver = VALID_MULTI_POD_POOLS_OPTS.get(pool_driver, None)
+    if valid_pod_driver and pod_driver in valid_pod_driver:
+        return True
+    return False

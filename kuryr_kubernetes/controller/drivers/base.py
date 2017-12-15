@@ -50,20 +50,29 @@ class DriverBase(object):
     """
 
     @classmethod
-    def get_instance(cls):
+    def get_instance(cls, driver_name=None):
         """Get an implementing driver instance."""
 
         alias = cls.ALIAS
-
-        try:
-            manager = _DRIVER_MANAGERS[alias]
-        except KeyError:
-            name = config.CONF.kubernetes[alias + '_driver']
-            manager = stv_driver.DriverManager(
-                namespace="%s.%s" % (_DRIVER_NAMESPACE_BASE, alias),
-                name=name,
-                invoke_on_load=True)
-            _DRIVER_MANAGERS[alias] = manager
+        if driver_name:
+            try:
+                manager = _DRIVER_MANAGERS[driver_name]
+            except KeyError:
+                manager = stv_driver.DriverManager(
+                    namespace="%s.%s" % (_DRIVER_NAMESPACE_BASE, alias),
+                    name=driver_name,
+                    invoke_on_load=True)
+                _DRIVER_MANAGERS[driver_name] = manager
+        else:
+            try:
+                manager = _DRIVER_MANAGERS[alias]
+            except KeyError:
+                name = config.CONF.kubernetes[alias + '_driver']
+                manager = stv_driver.DriverManager(
+                    namespace="%s.%s" % (_DRIVER_NAMESPACE_BASE, alias),
+                    name=name,
+                    invoke_on_load=True)
+                _DRIVER_MANAGERS[alias] = manager
 
         driver = manager.driver
         if not isinstance(driver, cls):

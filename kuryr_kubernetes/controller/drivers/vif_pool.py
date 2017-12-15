@@ -34,6 +34,7 @@ from kuryr_kubernetes.controller.drivers import default_subnet
 from kuryr_kubernetes.controller.managers import pool
 from kuryr_kubernetes import exceptions
 from kuryr_kubernetes import os_vif_util as ovu
+from kuryr_kubernetes import utils
 
 LOG = logging.getLogger(__name__)
 
@@ -53,6 +54,12 @@ vif_pool_driver_opts = [
                     help=_("Minimun interval (in seconds) "
                            "between pool updates"),
                     default=20),
+    oslo_cfg.DictOpt('pools_vif_drivers',
+                     help=_("Dict with the pool driver and pod driver to be "
+                            "used. If not set, it will take them from the "
+                            "kubernetes driver options for pool and pod "
+                            "drivers respectively"),
+                     default={}),
 ]
 
 oslo_cfg.CONF.register_opts(vif_pool_driver_opts, "vif_pool")
@@ -618,3 +625,57 @@ class NestedVIFPool(BaseVIFPool):
         no trunk is specified).
         """
         self._remove_precreated_ports(trunk_ips)
+
+
+class MultiVIFPool(base.VIFPoolDriver):
+    """Multi pool VIFs for Kubernetes Pods"""
+
+    def set_vif_driver(self):
+        self._vif_drvs = {}
+        pools_vif_drivers = oslo_cfg.CONF.vif_pool.pools_vif_drivers
+        if not pools_vif_drivers:
+            pod_vif = oslo_cfg.CONF.kubernetes.pod_vif_driver
+            drv_vif = base.PodVIFDriver.get_instance()
+            drv_pool = base.VIFPoolDriver.get_instance()
+            drv_pool.set_vif_driver(drv_vif)
+            self._vif_drvs[pod_vif] = drv_pool
+            return
+        for pool_driver, pod_driver in pools_vif_drivers.items():
+            if not utils.check_suitable_multi_pool_driver_opt(pool_driver,
+                                                              pod_driver):
+                LOG.ERROR("The pool and pod driver selected are not "
+                          "compatible. They will be skipped")
+                raise exceptions.MultiPodDriverPoolConfigurationNotSupported()
+            drv_vif = base.PodVIFDriver.get_instance(driver_name=pod_driver)
+            drv_pool = base.VIFPoolDriver.get_instance(driver_name=pool_driver)
+            drv_pool.set_vif_driver(drv_vif)
+            self._vif_drvs[pod_driver] = drv_pool
+
+    def request_vif(self, pod, project_id, subnets, security_groups):
+        node_type = self._get_node_type(pod)
+        return self._vif_drvs[node_type].request_vif(pod, project_id, subnets,
+                                                     security_groups)
+
+    def release_vif(self, pod, vif, *argv):
+        node_type = self._get_node_type(pod)
+        self._vif_drvs[node_type].release_vif(pod, vif, *argv)
+
+    def activate_vif(self, pod, vif):
+        node_type = self._get_node_type(pod)
+        self._vif_drvs[node_type].activate_vif(pod, vif)
+
+    def _get_node_type(self, pod):
+        node_name = pod['spec']['nodeName']
+        return self._get_node_vif_driver(node_name)
+
+    def _get_node_vif_driver(self, node_name):
+        kubernetes = clients.get_kubernetes_client()
+        node_info = kubernetes.get(
+            constants.K8S_API_BASE + '/nodes/' + node_name)
+
+        labels = node_info['metadata'].get('labels', None)
+        if labels:
+            pod_vif = labels.get('pod_vif',
+                                 oslo_cfg.CONF.kubernetes.pod_vif_driver)
+            return pod_vif
+        return oslo_cfg.CONF.kubernetes.pod_vif_driver
