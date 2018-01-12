@@ -13,7 +13,6 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-import os_vif
 import pyroute2
 from stevedore import driver as stv_driver
 
@@ -77,7 +76,6 @@ def _configure_l3(vif, ifname, netns):
 
 def connect(vif, instance_info, ifname, netns=None):
     driver = _get_binding_driver(vif)
-    os_vif.plug(vif, instance_info)
     driver.connect(vif, ifname, netns)
     _configure_l3(vif, ifname, netns)
 
@@ -85,4 +83,3 @@ def connect(vif, instance_info, ifname, netns=None):
 def disconnect(vif, instance_info, ifname, netns=None):
     driver = _get_binding_driver(vif)
     driver.disconnect(vif, ifname, netns)
-    os_vif.unplug(vif, instance_info)

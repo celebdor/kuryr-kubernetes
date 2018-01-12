@@ -82,7 +82,7 @@ def run():
 
     # Initialize o.vo registry.
     k_objects.register_locally_defined_vifs()
-    os_vif.initialize()
+    os_vif.objects.register_all()
 
     if CONF.cni_daemon.daemon_enabled:
         runner = cni_api.CNIDaemonizedRunner()
