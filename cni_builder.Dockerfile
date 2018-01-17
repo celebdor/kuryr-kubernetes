@@ -31,7 +31,6 @@ COPY . /opt/kuryr-kubernetes
 # Installing from dev because of this issue, https://github.com/pyinstaller/pyinstaller/issues/2434
 RUN cd /opt/kuryr-kubernetes \
     && patch -b kuryr_kubernetes/k8s_client.py < k8s_client.patch \
-    && patch -b kuryr_kubernetes/cni/main.py < cni_main.patch \
     && pip3.5 install --no-cache-dir . \
     && pip3.5 install git+https://github.com/pyinstaller/pyinstaller.git \
     && pip3.5 install pyroute2 \
