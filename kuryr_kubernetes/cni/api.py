@@ -135,6 +135,10 @@ class CNIStandaloneRunner(CNIRunner):
         return self._vif_data(vif)
 
     def _delete(self, params):
+        # kubelet can call us about non existing pods. Let's drop those
+        # requests
+        if not params.args.CNI_NETNS:
+            return
         self._plugin.delete(params)
 
     def prepare_env(self, env, stdin):
