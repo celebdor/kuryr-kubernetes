@@ -137,7 +137,11 @@ class CNIStandaloneRunner(CNIRunner):
     def _delete(self, params):
         # kubelet can call us about non existing pods. Let's drop those
         # requests
-        if not params.args.CNI_NETNS:
+        if not hasattr(params.args, 'CNI_NETNS'):
+            LOG.debug('Received delete request without CNI_NETNS. Params %r' %
+                      params)
+            return
+        elif not params.args.CNI_NETNS:
             return
         self._plugin.delete(params)
 
