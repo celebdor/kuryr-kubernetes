@@ -32,14 +32,30 @@ class NestedDriver(object):
         raise NotImplementedError()
 
     def connect(self, vif, ifname, netns):
+        # NOTE(vikasc): Ideally 'ifname' should be used here but instead a
+        # temporary name is being used while creating the device for
+        # container in host network namespace. This is because cni expects
+        # only 'eth0' as interface name and if host already has an
+        # interface named 'eth0', device creation will fail with 'already
+        # exists' error.
+        temp_name = vif.vif_name
+
+        # Check for any leftover ifaces and remove them.
         with b_base.get_ipdb() as h_ipdb:
-            # NOTE(vikasc): Ideally 'ifname' should be used here but instead a
-            # temporary name is being used while creating the device for
-            # container in host network namespace. This is because cni expects
-            # only 'eth0' as interface name and if host already has an
-            # interface named 'eth0', device creation will fail with 'already
-            # exists' error.
-            temp_name = vif.vif_name
+            if temp_name in h_ipdb.interfaces:
+                with h_ipdb.interfaces[temp_name] as iface:
+                    iface.remove()
+
+        with b_base.get_ipdb(netns) as c_ipdb:
+            if temp_name in c_ipdb.interfaces:
+                with c_ipdb.interfaces[temp_name] as iface:
+                    iface.remove()
+
+            if ifname in c_ipdb.interfaces:
+                with c_ipdb.interfaces[ifname] as iface:
+                    iface.remove()
+
+        with b_base.get_ipdb() as h_ipdb:
 
             # TODO(vikasc): evaluate whether we should have stevedore
             #               driver for getting the link device.
